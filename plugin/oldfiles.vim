@@ -208,7 +208,8 @@ function! s:OL_open() abort
 
 	" Get the tail part of the file name (without the directory) and display
 	" it along with the full path in parenthesis.
-	let  output = map(s:OL_files, g:OL_filename_format.formatter)
+	let m = copy(s:OL_files)
+	let output = map(m, g:OL_filename_format.formatter)
 	silent! 0put =output
 
 	" Delete the empty line at the end of the buffer
