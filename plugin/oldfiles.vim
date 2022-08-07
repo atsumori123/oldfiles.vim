@@ -115,7 +115,7 @@ endfunction
 " --------------------------------------------------------------
 " OL_selected
 " --------------------------------------------------------------
-function! s:OL_selected() abort
+function! s:OL_selected(open_cmd) abort
 	" Get selected line
 	let fname = getline(".")
 
@@ -127,9 +127,6 @@ function! s:OL_selected() abort
 	" The text in the OL window contains the filename in parenthesis
 	let file = matchstr(fname, g:OL_filename_format.parser)
 
-	" Escape special characters in a filename
-	let esc_fname = s:OL_escape_filename(file)
-
 	" If already open, jump to it or Edit the file
 	let winnum = bufwinnr('^' . file . '$')
 	if winnum != -1
@@ -137,7 +134,7 @@ function! s:OL_selected() abort
 	else
 		" Return to recent window and open
 		exe 'wincmd p'
-		exe 'edit ' . esc_fname
+		execute printf('%s %s', a:open_cmd, s:OL_escape_filename(file))
 	endif
 endfunction
 
@@ -196,8 +193,9 @@ function! s:OL_open() abort
 	set cpoptions&vim
 
 	" Create mappings to select and edit a file from the OL list
-	nnoremap <buffer> <silent> <CR> :call <SID>OL_selected()<CR>
-	nnoremap <buffer> <silent> l :call <SID>OL_selected()<CR>
+	nnoremap <buffer> <silent> <CR> :call <SID>OL_selected('edit')<CR>
+	nnoremap <buffer> <silent> l :call <SID>OL_selected('edit')<CR>
+	nnoremap <buffer> <silent> v :call <SID>OL_selected('vsplit')<CR>
 	nnoremap <buffer> <silent> q :close<CR>
 	if s:OL_use_ol_file
 		nnoremap <buffer> <silent> d :<C-U>call <SID>OL_delete_from_list()<CR>
