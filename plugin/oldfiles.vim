@@ -96,7 +96,12 @@ endfunction
 " OL_load_from_ol_file
 " --------------------------------------------------------------
 function! s:OL_load_from_ol_file() abort
-       	let s:OL_files = filereadable(s:OL_FILE) ? readfile(s:OL_FILE) : []
+	let s:OL_files = filereadable(s:OL_FILE) ? readfile(s:OL_FILE) : []
+	let num = len(s:OL_files)
+	call filter(s:OL_files, 'filereadable(v:val)')
+	if num != len(s:OL_files)
+		call writefile(s:OL_files, s:OL_FILE)
+	endif
 endfunction
 
 " --------------------------------------------------------------
@@ -134,7 +139,7 @@ function! s:OL_selected(open_cmd) abort
 	else
 		" Return to recent window and open
 		exe 'wincmd p'
-		execute printf('%s %s', a:open_cmd, s:OL_escape_filename(file))
+		exe printf('%s %s', a:open_cmd, s:OL_escape_filename(file))
 	endif
 endfunction
 
@@ -182,7 +187,7 @@ function! s:OL_open() abort
 	setlocal noswapfile
 	setlocal nobuflisted
 	setlocal nowrap
-    setlocal winfixheight winfixwidth
+	setlocal winfixheight winfixwidth
 
 	" Set the 'filetype' to 'OL'. This allows the user to apply custom
 	" syntax highlighting or other changes to the OL bufer.
@@ -227,46 +232,46 @@ endfunction
 " OL_add
 " --------------------------------------------------------------
 function! s:OL_add(acmd_bufnr) abort
-    if s:OL_list_locked
-        " OL list is currently locked
-        return
-    endif
+	if s:OL_list_locked
+		" OL list is currently locked
+		return
+	endif
 
 	" Get the full path to the filename
 	let fname = fnamemodify(bufname(a:acmd_bufnr + 0), ':p')
 	if fname == '' | return | endif
-	
+
 	" Skip temporary buffers with buftype set.
 	" The buftype is set for buffers used by plugins.
 	if &buftype != '' | return | endif
-	
+
 	" If file is readable, then skip
 	if !filereadable(fname) | return | endif
-	
+
 	" Load the latest OL file list
 	call s:OL_load_from_ol_file()
 
 	" Remove the new file name from the existing OL list (if already present)
 	call filter(s:OL_files, 'v:val !=# fname')
-	
+
 	" Add the new file list to the beginning of the updated old file list
 	call insert(s:OL_files, fname, 0)
-	
+
 	" Trim the list
 	if len(s:OL_files) > s:OL_max_entries
 		call remove(s:OL_files, s:OL_max_entries, -1)
 	endif
-	
+
 	" Save the updated OL list
 	call writefile(s:OL_files, s:OL_FILE)
-	
+
 	" If the OL window is open, update the displayed OL list
 	if bufwinnr(s:OL_buf_name) != -1
 		let cur_winnr = winnr()
 		call s:OL_open()
 		exe cur_winnr . 'wincmd w'
 	endif
-endfunc
+endfunction
 
 " --------------------------------------------------------------
 " OL_delete_from_list
@@ -277,7 +282,7 @@ function s:OL_delete_from_list()
 	del _
 	setlocal nomodifiable
 	call writefile(s:OL_files, s:OL_FILE)
-endfunc
+endfunction
 
 " --------------------------------------------------------------
 " OL
