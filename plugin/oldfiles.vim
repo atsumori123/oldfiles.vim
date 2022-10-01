@@ -143,6 +143,23 @@ function! s:OL_selected(open_cmd) abort
 	endif
 endfunction
 
+"---------------------------------------------------------------
+" OL_skip_cursor
+"---------------------------------------------------------------
+function! s:OL_skip_cursor() abort
+	let key = getcharstr()
+	if key == "" | return | endif
+
+	let items = map(copy(s:OL_files), 'fnamemodify(v:val, ":t")')
+	let n = line(".")
+	for i in range(1, len(s:OL_files))
+		if n >= len(s:OL_files) | let n = 0 | endif
+		if items[n][0] ==# key | break | endif
+		let n += 1
+	endfor
+	call cursor([n+1, 1, 0, 1])
+endfunction
+
 " --------------------------------------------------------------
 " OL_selected_fzf
 " --------------------------------------------------------------
@@ -201,6 +218,7 @@ function! s:OL_open() abort
 	nnoremap <buffer> <silent> <CR> :call <SID>OL_selected('edit')<CR>
 	nnoremap <buffer> <silent> l :call <SID>OL_selected('edit')<CR>
 	nnoremap <buffer> <silent> v :call <SID>OL_selected('vsplit')<CR>
+	nnoremap <buffer> <silent> f :call <SID>OL_skip_cursor()<CR>
 	nnoremap <buffer> <silent> q :close<CR>
 	if s:OL_use_ol_file
 		nnoremap <buffer> <silent> d :<C-U>call <SID>OL_delete_from_list()<CR>
