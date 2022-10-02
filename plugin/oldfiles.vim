@@ -8,17 +8,17 @@ let s:cpo_save = &cpo
 set cpo&vim
 
 " Maximum number of entries allowed in the recent files
-let s:OL_max_entries = 50
+let s:max_entries = 50
 " Height of the window
-let s:OL_window_height = 16
+let s:window_height = 16
 " OL buffer name
-let s:OL_buf_name = '-Old files-'
+let s:buf_name = '-Old files-'
 " Lock ol when execute grep
-let s:OL_list_locked = 0
-" Use vim_ol_file
-let s:OL_use_ol_file = 1
+let s:list_locked = 0
+" Use vim_olfile
+let s:use_olfile = 1
 " Use FZF
-let s:OL_use_fzf = exists('*fzf#run') ? 0 : 0
+let s:use_fzf = exists('*fzf#run') ? 0 : 0
 
 " --------------------------------------------------------------
 " Format of the file names displayed in the OL window.
@@ -38,7 +38,7 @@ let g:OL_filename_format = {
 " --------------------------------------------------------------
 " OL file
 " --------------------------------------------------------------
-if s:OL_use_ol_file
+if s:use_olfile
 	if has('unix') || has('macunix')
 		let s:OL_FILE = $HOME . '/.vim_ol_files'
 	else
@@ -51,13 +51,13 @@ if s:OL_use_ol_file
 endif
 
 " --------------------------------------------------------------
-" OL_load_from_oldfiles
+" load_oldfiles_from_oldfiles
 " --------------------------------------------------------------
-function! s:OL_load_from_oldfiles() abort
-	let s:OL_files = []
+function! s:load_oldfiles_from_oldfiles() abort
+	let s:OldFiles = []
 
 	for l:b in range(1, bufnr('$'))
-		if len(s:OL_files) >= s:OL_max_entries | break | endif
+		if len(s:OldFiles) >= s:max_entries | break | endif
 
 		" skip non-existing, unnamed and special buffers.
 		if empty(bufname(l:b)) || !empty(getbufvar(l:b, '&buftype'))
@@ -71,11 +71,11 @@ function! s:OL_load_from_oldfiles() abort
 		endif
 
 		" Add to list
-		call add(s:OL_files, fname)
+		call add(s:OldFiles, fname)
 	endfor
 
 	for l:f in v:oldfiles
-		if len(s:OL_files) >= s:OL_max_entries | break | endif
+		if len(s:OldFiles) >= s:max_entries | break | endif
 
 		" Convert to full path filename. check readable
 		let fname = expand(l:f)
@@ -84,42 +84,40 @@ function! s:OL_load_from_oldfiles() abort
 		endif
 
 		" Duplicate check
-		let fname = s:OL_escape_filename(fname)
-		call filter(s:OL_files, 'v:val !=# fname')
+		let fname = s:escape_filename(fname)
+		call filter(s:OldFiles, 'v:val !=# fname')
 
 		" Add to list
-		call add(s:OL_files, fname)
+		call add(s:OldFiles, fname)
 	endfor
 endfunction
 
 " --------------------------------------------------------------
-" OL_load_from_ol_file
+" load_oldfiles_from_olfile
 " --------------------------------------------------------------
-function! s:OL_load_from_ol_file() abort
-	let s:OL_files = filereadable(s:OL_FILE) ? readfile(s:OL_FILE) : []
+function! s:load_oldfiles_from_olfile() abort
+	let s:OldFiles = filereadable(s:OL_FILE) ? readfile(s:OL_FILE) : []
 endfunction
 
 " --------------------------------------------------------------
-" OL_escape_filename
+" escape_filename
 " --------------------------------------------------------------
-function! s:OL_escape_filename(fname) abort
-	let esc_filename_chars = ' *?[{`$%#"|!<>();&' . "'\t\n"
-
+function! s:escape_filename(fname) abort
 	if exists("*fnameescape")
 		return fnameescape(a:fname)
 	else
+		let esc_filename_chars = ' *?[{`$%#"|!<>();&' . "'\t\n"
 		return escape(a:fname, esc_filename_chars)
 	endif
 endfunction
 
 " --------------------------------------------------------------
-" OL_selected
+" select_item
 " --------------------------------------------------------------
-function! s:OL_selected(open_cmd) abort
-	" Get selected line
+function! s:select_item(open_cmd) abort
 	let fname = getline(".")
 
-	" Automatically close the OL window
+	" Automatically close the window
 	silent! close
 
 	if fname == '' | return | endif
@@ -134,42 +132,42 @@ function! s:OL_selected(open_cmd) abort
 	else
 		" Return to recent window and open
 		exe 'wincmd p'
-		exe printf('%s %s', a:open_cmd, s:OL_escape_filename(file))
+		exe printf('%s %s', a:open_cmd, s:escape_filename(file))
 	endif
 endfunction
 
 "---------------------------------------------------------------
-" OL_remove_non_existing_files
+" remove_non_existing_item_from_oldfiles
 "---------------------------------------------------------------
-function! s:OL_remove_non_existing_files() abort
-	call s:OL_load_from_ol_file()
-	let old_num = len(s:OL_files)
-	call filter(s:OL_files, 'filereadable(v:val)')
-	let yesno = input(printf("%d files remove ? [y/n] ", old_num - len(s:OL_files)))
+function! s:remove_non_existing_item_from_oldfiles() abort
+	call s:load_oldfiles()
+	let old_num = len(s:OldFiles)
+	call filter(s:OldFiles, 'filereadable(v:val)')
+	let yesno = input(printf("%d files remove ? [y/n] ", old_num - len(s:OldFiles)))
 	if yesno !=? "y" | return | endif
-	call writefile(s:OL_files, s:OL_FILE)
-	call OL_draw()
+	call writefile(s:OldFiles, s:OL_FILE)
+	call s:draw_buffer()
 endfunction
 
 "---------------------------------------------------------------
-" OL_skip_cursor
+" filtering_item
 "---------------------------------------------------------------
-function! s:OL_skip_cursor() abort
+function! s:filtering_item() abort
 	let key = getcharstr()
 	if key == "" | return | endif
 
-	call s:OL_load_from_ol_file()
+	call s:load_oldfiles()
 	if key =~ "[a-z._]"
-		call filter(s:OL_files, 'fnamemodify(v:val, ":t")[0] ==? key')
+		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? key')
 	endif
-	call s:OL_draw()
+	call s:draw_buffer()
 endfunction
 
 " --------------------------------------------------------------
-" OL_selected_fzf
+" select_item_fzf
 " --------------------------------------------------------------
-function! s:OL_selected_fzf(fname) abort
-	let l:fname = s:OL_escape_filename(a:fname)
+function! s:select_item_fzf(fname) abort
+	let l:fname = s:escape_filename(a:fname)
 
 	" If already open, jump to it or Edit the file
 	let winnum = bufwinnr('^' . a:fname . '$')
@@ -181,22 +179,22 @@ function! s:OL_selected_fzf(fname) abort
 endfunction
 
 " --------------------------------------------------------------
-" OL_warn_msg
+" warn_msg
 " --------------------------------------------------------------
-function! s:OL_warn_msg(msg) abort
+function! s:warn_msg(msg) abort
 	echohl WarningMsg | echo a:msg | echohl None
 endfunction
 
 " --------------------------------------------------------------
-" OL_draw
+" draw_buffer
 " --------------------------------------------------------------
-function! s:OL_draw() abort
+function! s:draw_buffer() abort
 	setlocal modifiable
 
 	" Delete the contents of the buffer to the black-hole register
 	silent! %delete _
 
-	let output = map(s:OL_files, g:OL_filename_format.formatter)
+	let output = map(s:OldFiles, g:OL_filename_format.formatter)
 	silent! 0put =output
 
 	" Delete the empty line at the end of the buffer
@@ -209,16 +207,16 @@ function! s:OL_draw() abort
 endfunction
 
 " --------------------------------------------------------------
-" OL_open
+" open_buffer
 " --------------------------------------------------------------
-function! s:OL_open() abort
-	let winnum = bufwinnr(s:OL_buf_name)
+function! s:open_buffer() abort
+	let winnum = bufwinnr(s:buf_name)
 	if winnum != -1
 		" Already in the window, jump to it
 		exe winnum . 'wincmd w'
 	else
 		" Open a new window at the bottom
-		exe 'silent! botright '.s:OL_window_height.'split '.s:OL_buf_name
+		exe 'silent! botright '.s:window_height.'split '.s:buf_name
 	endif
 
 	setlocal buftype=nofile
@@ -234,17 +232,17 @@ function! s:OL_open() abort
 	set cpoptions&vim
 
 	" Create mappings to select and edit a file from the OL list
-	nnoremap <buffer> <silent> <CR> :call <SID>OL_selected('edit')<CR>
-	nnoremap <buffer> <silent> l :call <SID>OL_selected('edit')<CR>
-	nnoremap <buffer> <silent> v :call <SID>OL_selected('vsplit')<CR>
-	nnoremap <buffer> <silent> f :call <SID>OL_skip_cursor()<CR>
+	nnoremap <buffer> <silent> <CR> :call <SID>select_item('edit')<CR>
+	nnoremap <buffer> <silent> l :call <SID>select_item('edit')<CR>
+	nnoremap <buffer> <silent> v :call <SID>select_item('vsplit')<CR>
+	nnoremap <buffer> <silent> f :call <SID>filtering_item()<CR>
 	nnoremap <buffer> <silent> q :close<CR>
-	if s:OL_use_ol_file
-		nnoremap <buffer> <silent> d :<C-U>call <SID>OL_delete_from_list()<CR>
-		nnoremap <buffer> <silent> clear :<C-U>call <SID>OL_remove_non_existing_files()<CR>
+	if s:use_olfile
+		nnoremap <buffer> <silent> d :<C-U>call <SID>delete_item_from_oldfiles()<CR>
+		nnoremap <buffer> <silent> clean :<C-U>call <SID>remove_non_existing_item_from_oldfiles()<CR>
 	endif
 
-	call s:OL_draw()
+	call s:draw_buffer()
 
 	" Restore the previous cpoptions settings
 	let &cpoptions = old_cpoptions
@@ -255,11 +253,11 @@ function! s:OL_open() abort
 endfunction
 
 " --------------------------------------------------------------
-" OL_add
+" add_item
 " --------------------------------------------------------------
-function! s:OL_add(acmd_bufnr) abort
-	if s:OL_list_locked
-		" OL list is currently locked
+function! s:add_item(acmd_bufnr) abort
+	if s:list_locked
+		" oldfiles list is currently locked
 		return
 	endif
 
@@ -274,90 +272,86 @@ function! s:OL_add(acmd_bufnr) abort
 	" If file is readable, then skip
 	if !filereadable(fname) | return | endif
 
-	" Load the latest OL file list
-	call s:OL_load_from_ol_file()
+	" Load the latest oldfiles list
+	call s:load_oldfiles()
 
-	" Remove the new file name from the existing OL list (if already present)
-	call filter(s:OL_files, 'v:val !=# fname')
+	" Remove the new file name from the existing list (if already present)
+	call filter(s:OldFiles, 'v:val !=# fname')
 
 	" Add the new file list to the beginning of the updated old file list
-	call insert(s:OL_files, fname, 0)
+	call insert(s:OldFiles, fname, 0)
 
 	" Trim the list
-	if len(s:OL_files) > s:OL_max_entries
-		call remove(s:OL_files, s:OL_max_entries, -1)
+	if len(s:OldFiles) > s:max_entries
+		call remove(s:OldFiles, s:max_entries, -1)
 	endif
 
-	" Save the updated OL list
-	call writefile(s:OL_files, s:OL_FILE)
+	" Save the updated oldfiles list
+	call writefile(s:OldFiles, s:OL_FILE)
 
-	" If the OL window is open, update the displayed OL list
-	if bufwinnr(s:OL_buf_name) != -1
+	" If the OL window is open, update the displayed oldfiles list
+	if bufwinnr(s:buf_name) != -1
 		let cur_winnr = winnr()
-		call s:OL_open()
+		call s:open_buffer()
 		exe cur_winnr . 'wincmd w'
 	endif
 endfunction
 
 " --------------------------------------------------------------
-" OL_delete_from_list
+" delete_item_from_oldfiles
 " --------------------------------------------------------------
-function s:OL_delete_from_list()
-	let backup = s:OL_files
-	call s:OL_load_from_ol_file()
-	call filter(s:OL_files, 'v:val != matchstr(getline("."), g:OL_filename_format.parser)')
+function s:delete_item_from_oldfiles()
+	let backup = s:OldFiles
+	call s:load_oldfiles()
+	call filter(s:OldFiles, 'v:val != matchstr(getline("."), g:OL_filename_format.parser)')
 	setlocal modifiable
 	del _
 	setlocal nomodifiable
-	call writefile(s:OL_files, s:OL_FILE)
-	let s:OL_files = backup
+	call writefile(s:OldFiles, s:OL_FILE)
+	let s:OldFiles = backup
 endfunction
 
 " --------------------------------------------------------------
 " OL
 " --------------------------------------------------------------
 function! s:OL(...) abort
-	" Load the old files
-	if s:OL_use_ol_file
-		call s:OL_load_from_ol_file()
-	else
-		call s:OL_load_from_oldfiles()
-	endif
-
-	" OL list empty check
-	if empty(s:OL_files)
-		call s:OL_warn_msg('Old files list is empty')
+	let s:load_oldfiles = s:use_olfile ?
+					\ function('s:load_oldfiles_from_olfile') :
+					\ function('s:load_oldfiles_from_oldfiles')
+	call s:load_oldfiles()
+	if empty(s:OldFiles)
+		call s:warn_msg('Old files list is empty')
 		return
 	endif
 
 	" Filtering
 	if a:0 != 0
-		call filter(s:OL_files, 'v:val =~# a:1')
-		if len(s:OL_files) == 0
-			call s:OL_warn_msg("Old files list doesn't contain files matching " . a:1)
+		call filter(s:OldFiles, 'v:val =~# a:1')
+		if len(s:OldFiles) == 0
+			call s:warn_msg("Old files list doesn't contain files matching " . a:1)
 			return
 		endif
 	endif
 
-	if s:OL_use_fzf
-		call fzf#run(fzf#wrap({'source' : s:OL_files,
-			\ 'sink' : function('s:OL_selected_fzf'),
+	if s:use_fzf
+		call fzf#run(fzf#wrap({'source' : s:OldFiles,
+			\ 'sink' : function('s:select_item_fzf'),
 			\ 'options' : '--color=fg+:2',
 			\ 'down' : '25%'}, 0))
 	else
-		call s:OL_open()
+		call s:open_buffer()
 	endif
 endfunction
 
 " --------------------------------------------------------------
 " Command to open the OL window
 " --------------------------------------------------------------
-if s:OL_use_ol_file
-	autocmd BufRead * call s:OL_add(expand('<abuf>'))
-	autocmd BufNewFile * call s:OL_add(expand('<abuf>'))
-	autocmd BufWritePost * call s:OL_add(expand('<abuf>'))
-	autocmd QuickFixCmdPre *vimgrep* let s:OL_list_locked = 1
-	autocmd QuickFixCmdPost *vimgrep* let s:OL_list_locked = 0
+if s:use_olfile
+	autocmd BufRead * call s:add_item(expand('<abuf>'))
+	autocmd BufNewFile * call s:add_item(expand('<abuf>'))
+	autocmd BufWritePost * call s:add_item(expand('<abuf>'))
+	autocmd QuickFixCmdPre *vimgrep* let s:list_locked = 1
+	autocmd QuickFixCmdPost *vimgrep* let s:list_locked = 0
 endif
 
 command! -nargs=? OL call s:OL(<f-args>)
