@@ -97,11 +97,6 @@ endfunction
 " --------------------------------------------------------------
 function! s:OL_load_from_ol_file() abort
 	let s:OL_files = filereadable(s:OL_FILE) ? readfile(s:OL_FILE) : []
-	let num = len(s:OL_files)
-	call filter(s:OL_files, 'filereadable(v:val)')
-	if num != len(s:OL_files)
-		call writefile(s:OL_files, s:OL_FILE)
-	endif
 endfunction
 
 " --------------------------------------------------------------
@@ -144,17 +139,30 @@ function! s:OL_selected(open_cmd) abort
 endfunction
 
 "---------------------------------------------------------------
+" OL_remove_non_existing_files
+"---------------------------------------------------------------
+function! s:OL_remove_non_existing_files() abort
+	call s:OL_load_from_ol_file()
+	let old_num = len(s:OL_files)
+	call filter(s:OL_files, 'filereadable(v:val)')
+	let yesno = input(printf("%d files remove ? [y/n] ", old_num - len(s:OL_files)))
+	if yesno !=? "y" | return | endif
+	call writefile(s:OL_files, s:OL_FILE)
+	call OL_draw()
+endfunction
+
+"---------------------------------------------------------------
 " OL_skip_cursor
 "---------------------------------------------------------------
 function! s:OL_skip_cursor() abort
 	let key = getcharstr()
 	if key == "" | return | endif
 
-	let wrapscan = &wrapscan
-	set wrapscan
-	let @/ = '^'.key
-	silent! normal n
-	execute wrapscan ? 'set wrapscan' : 'set nowrapscan'
+	call s:OL_load_from_ol_file()
+	if key =~ "[a-z._]"
+		call filter(s:OL_files, 'fnamemodify(v:val, ":t")[0] ==? key')
+	endif
+	call s:OL_draw()
 endfunction
 
 " --------------------------------------------------------------
@@ -180,6 +188,27 @@ function! s:OL_warn_msg(msg) abort
 endfunction
 
 " --------------------------------------------------------------
+" OL_draw
+" --------------------------------------------------------------
+function! s:OL_draw() abort
+	setlocal modifiable
+
+	" Delete the contents of the buffer to the black-hole register
+	silent! %delete _
+
+	let output = map(s:OL_files, g:OL_filename_format.formatter)
+	silent! 0put =output
+
+	" Delete the empty line at the end of the buffer
+	silent! $delete _
+
+	" Move the cursor to the beginning of the file
+	normal! gg
+
+	setlocal nomodifiable
+endfunction
+
+" --------------------------------------------------------------
 " OL_open
 " --------------------------------------------------------------
 function! s:OL_open() abort
@@ -192,19 +221,12 @@ function! s:OL_open() abort
 		exe 'silent! botright '.s:OL_window_height.'split '.s:OL_buf_name
 	endif
 
-	" Delete the contents of the buffer to the black-hole register
-	setlocal modifiable
-	silent! %delete _
-
 	setlocal buftype=nofile
 	setlocal bufhidden=delete
 	setlocal noswapfile
 	setlocal nobuflisted
 	setlocal nowrap
 	setlocal winfixheight winfixwidth
-
-	" Set the 'filetype' to 'OL'. This allows the user to apply custom
-	" syntax highlighting or other changes to the OL bufer.
 	setlocal filetype=OL
 
 	" Setup the cpoptions properly for the maps to work
@@ -219,28 +241,17 @@ function! s:OL_open() abort
 	nnoremap <buffer> <silent> q :close<CR>
 	if s:OL_use_ol_file
 		nnoremap <buffer> <silent> d :<C-U>call <SID>OL_delete_from_list()<CR>
+		nnoremap <buffer> <silent> clear :<C-U>call <SID>OL_remove_non_existing_files()<CR>
 	endif
+
+	call s:OL_draw()
 
 	" Restore the previous cpoptions settings
 	let &cpoptions = old_cpoptions
 
-	" Get the tail part of the file name (without the directory) and display
-	" it along with the full path in parenthesis.
-	let m = copy(s:OL_files)
-	let output = map(m, g:OL_filename_format.formatter)
-	silent! 0put =output
-
-	" Delete the empty line at the end of the buffer
-	silent! $delete _
-
-	" Move the cursor to the beginning of the file
-	normal! gg
-
 	" Add syntax highlighting for the file names
 	exe "syntax match OLFileName '" . g:OL_filename_format.syntax . "'"
 	highlight default link OLFileName Identifier
-
-	setlocal nomodifiable
 endfunction
 
 " --------------------------------------------------------------
@@ -292,11 +303,14 @@ endfunction
 " OL_delete_from_list
 " --------------------------------------------------------------
 function s:OL_delete_from_list()
+	let backup = s:OL_files
+	call s:OL_load_from_ol_file()
 	call filter(s:OL_files, 'v:val != matchstr(getline("."), g:OL_filename_format.parser)')
 	setlocal modifiable
 	del _
 	setlocal nomodifiable
 	call writefile(s:OL_files, s:OL_FILE)
+	let s:OL_files = backup
 endfunction
 
 " --------------------------------------------------------------
