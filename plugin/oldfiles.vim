@@ -100,6 +100,17 @@ function! s:load_oldfiles_from_olfile() abort
 endfunction
 
 " --------------------------------------------------------------
+" load_oldfiles
+" --------------------------------------------------------------
+function! s:load_oldfiles() abort
+	if s:use_olfile
+		call s:load_oldfiles_from_olfile()
+	else
+		call s:load_oldfiles_from_oldfiles()
+	endif
+endfunction
+
+" --------------------------------------------------------------
 " escape_filename
 " --------------------------------------------------------------
 function! s:escape_filename(fname) abort
@@ -153,11 +164,11 @@ endfunction
 " filtering_item
 "---------------------------------------------------------------
 function! s:filtering_item() abort
-	let key = getcharstr()
+	let key = nr2char(getchar())
 	if key == "" | return | endif
 
 	call s:load_oldfiles()
-	if key =~ "[a-z._]"
+	if key =~ "[a-z0-9._]"
 		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? key')
 	endif
 	call s:draw_buffer()
@@ -315,9 +326,6 @@ endfunction
 " OL
 " --------------------------------------------------------------
 function! s:OL(...) abort
-	let s:load_oldfiles = s:use_olfile ?
-					\ function('s:load_oldfiles_from_olfile') :
-					\ function('s:load_oldfiles_from_oldfiles')
 	call s:load_oldfiles()
 	if empty(s:OldFiles)
 		call s:warn_msg('Old files list is empty')
