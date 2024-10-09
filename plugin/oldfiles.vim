@@ -326,6 +326,11 @@ endfunction
 " OL
 " --------------------------------------------------------------
 function! s:OL(...) abort
+	if &buftype == 'quickfix'
+		echohl WarningMsg | echo "Cannot executed with quickfix window" | echohl None
+		return
+	endif
+
 	call s:load_oldfiles()
 	if empty(s:OldFiles)
 		call s:warn_msg('Old files list is empty')
@@ -349,6 +354,13 @@ function! s:OL(...) abort
 	else
 		call s:open_buffer()
 	endif
+endfunction
+
+" --------------------------------------------------------------
+" OL lock
+" --------------------------------------------------------------
+function! oldfiles#lock(v) abort
+	let s:list_locked = a:v
 endfunction
 
 " --------------------------------------------------------------
