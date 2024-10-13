@@ -14,7 +14,7 @@ let s:window_height = 16
 " OL buffer name
 let s:buf_name = '-Old files-'
 " Lock ol when execute grep
-let s:list_locked = 0
+let g:lock_oldfiles = 0
 " Use vim_olfile
 let s:use_olfile = 1
 " Use FZF
@@ -267,10 +267,8 @@ endfunction
 " add_item
 " --------------------------------------------------------------
 function! s:add_item(acmd_bufnr) abort
-	if s:list_locked
-		" oldfiles list is currently locked
-		return
-	endif
+	" oldfiles list is currently locked
+	if g:lock_oldfiles | return | endif
 
 	" Get the full path to the filename
 	let fname = fnamemodify(bufname(a:acmd_bufnr + 0), ':p')
@@ -357,21 +355,14 @@ function! s:OL(...) abort
 endfunction
 
 " --------------------------------------------------------------
-" OL lock
-" --------------------------------------------------------------
-function! oldfiles#lock(v) abort
-	let s:list_locked = a:v
-endfunction
-
-" --------------------------------------------------------------
 " Command to open the OL window
 " --------------------------------------------------------------
 if s:use_olfile
 	autocmd BufRead * call s:add_item(expand('<abuf>'))
 	autocmd BufNewFile * call s:add_item(expand('<abuf>'))
 	autocmd BufWritePost * call s:add_item(expand('<abuf>'))
-	autocmd QuickFixCmdPre *vimgrep* let s:list_locked = 1
-	autocmd QuickFixCmdPost *vimgrep* let s:list_locked = 0
+	autocmd QuickFixCmdPre *vimgrep* let g:lock_oldfiles = 1
+	autocmd QuickFixCmdPost *vimgrep* let g:lock_oldfiles = 0
 endif
 
 command! -nargs=? OL call s:OL(<f-args>)
