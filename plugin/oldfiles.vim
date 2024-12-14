@@ -40,12 +40,12 @@ let g:OL_filename_format = {
 " --------------------------------------------------------------
 if s:use_olfile
 	if has('unix') || has('macunix')
-		let s:OL_FILE = $HOME . '/.vim_ol_files'
+		let s:OL_FILE = $HOME . '/.vim_oldfiles'
 	else
 		if has('win32') && $USERPROFILE != ''
-			let s:OL_FILE = $USERPROFILE . '\_vim_ol_files'
+			let s:OL_FILE = $USERPROFILE . '\_vim_oldfiles'
 		else
-			let s:OL_FILE = $VIM . '/_vim_ol_files'
+			let s:OL_FILE = $VIM . '/_vim_oldfiles'
 		endif
 	endif
 endif
@@ -160,16 +160,43 @@ function! s:remove_non_existing_item_from_oldfiles() abort
 	call s:draw_buffer()
 endfunction
 
+
+"---------------------------------------------------------------
+" get character
+"---------------------------------------------------------------
+function! s:getchar(msg)
+	" Workaround for https://github.com/osyo-manga/vital-over/issues/53
+	echo a:msg
+
+	try
+		let char = call('getchar', a:000)
+	catch /^Vim:Interrupt$/
+		let char = 3 " <C-c>
+	endtry
+	if char == 27 || char == 3
+		" Escape or <C-c> key pressed
+		redraw
+		echo "Canceled"
+		return ''
+	endif
+
+	redraw
+	echo ""
+	return	nr2char(char)
+endfunction
+
 "---------------------------------------------------------------
 " filtering_item
 "---------------------------------------------------------------
 function! s:filtering_item() abort
-	let key = nr2char(getchar())
-	if key == "" | return | endif
+	let char = s:getchar("Filtering character: ")
+	if char == ""
+		return
+	end
 
 	call s:load_oldfiles()
-	if key =~ "[a-z0-9._]"
-		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? key')
+	if char =~ "[a-z0-9._]"
+		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? char')
 	endif
 	call s:draw_buffer()
 endfunction
@@ -247,7 +274,7 @@ function! s:open_buffer() abort
 	nnoremap <buffer> <silent> l :call <SID>select_item('edit')<CR>
 	nnoremap <buffer> <silent> v :call <SID>select_item('vsplit')<CR>
 	nnoremap <buffer> <silent> f :call <SID>filtering_item()<CR>
-	nnoremap <buffer> <silent> q :close<CR>
+	nnoremap <buffer> <silent> q :close<CR>:execute "wincmd p"<CR>
 	if s:use_olfile
 		nnoremap <buffer> <silent> d :<C-U>call <SID>delete_item_from_oldfiles()<CR>
 		nnoremap <buffer> <silent> clean :<C-U>call <SID>remove_non_existing_item_from_oldfiles()<CR>
