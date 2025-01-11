@@ -273,10 +273,10 @@ function! s:open_buffer() abort
 	nnoremap <buffer> <silent> <CR> :call <SID>select_item('edit')<CR>
 	nnoremap <buffer> <silent> l :call <SID>select_item('edit')<CR>
 	nnoremap <buffer> <silent> v :call <SID>select_item('vsplit')<CR>
-	nnoremap <buffer> <silent> f :call <SID>filtering_item()<CR>
+	nnoremap <buffer> <silent> s :call <SID>filtering_item()<CR>
 	nnoremap <buffer> <silent> q :close<CR>:execute "wincmd p"<CR>
 	if s:use_olfile
-		nnoremap <buffer> <silent> d :<C-U>call <SID>delete_item_from_oldfiles()<CR>
+		nnoremap <buffer> <silent> dd :<C-U>call <SID>delete_item_from_oldfiles()<CR>
 		nnoremap <buffer> <silent> clean :<C-U>call <SID>remove_non_existing_item_from_oldfiles()<CR>
 	endif
 
