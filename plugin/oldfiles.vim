@@ -31,8 +31,8 @@ let s:use_fzf = exists('*fzf#run') ? 0 : 0
 " --------------------------------------------------------------
 let g:OL_filename_format = {
         \   'formatter': 'fnamemodify(v:val, ":t") . " (" . v:val . ")"',
-        \   'parser': '(\zs.*\ze)',
-        \   'syntax': '^.\{-}\ze('
+        \   'parser': '(\zs\(\w\+:\)\?[\/].*\ze)$',
+        \   'syntax': '.*\ze (\(\w\+:\)\?[/\\].*)$'
         \}
 
 " --------------------------------------------------------------
@@ -287,6 +287,7 @@ function! s:open_buffer() abort
 
 	" Add syntax highlighting for the file names
 	exe "syntax match OLFileName '" . g:OL_filename_format.syntax . "'"
+"	syntax match OLFileName ".*\ze (\(\w\+:\)\?[/\\].*)$"
 	highlight default link OLFileName Identifier
 endfunction
 
