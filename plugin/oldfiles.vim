@@ -287,7 +287,6 @@ function! s:open_buffer() abort
 
 	" Add syntax highlighting for the file names
 	exe "syntax match OLFileName '" . g:OL_filename_format.syntax . "'"
-"	syntax match OLFileName ".*\ze (\(\w\+:\)\?[/\\].*)$"
 	highlight default link OLFileName Identifier
 endfunction
 
