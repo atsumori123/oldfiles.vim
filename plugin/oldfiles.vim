@@ -147,10 +147,11 @@ endfunction
 " filter by first character
 "---------------------------------------------------------------
 function! s:filter_by_first_character() abort
-	call s:load_oldfiles()
 	let char = s:getchar("Filtering character: ")
 	if char =~ "[a-z0-9._]"
 		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? char')
+	else
+		call s:load_oldfiles()
 	endif
 endfunction
 
@@ -158,10 +159,11 @@ endfunction
 " filter by search pattern
 "---------------------------------------------------------------
 function! s:filter_by_search_pattern() abort
-	call s:load_oldfiles()
 	let pattern = input('/')
 	if !empty(pattern)
 		call filter(s:OldFiles, 'v:val =~ pattern')
+	else
+		call s:load_oldfiles()
 	endif
 endfunction
 
