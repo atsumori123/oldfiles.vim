@@ -11,6 +11,10 @@ set cpo&vim
 let s:max_entries = 50
 " Vertical split edit
 let s:vsplit = 0
+" 複数キーによるコンビネーション用
+let s:last_key = ''
+" 前回打鍵したときの時間
+let s:last_time = [0, 0] " [seconds, microseconds]
 " Lock ol when execute grep
 let g:lock_oldfiles = 0
 " oldfiles用のハイライトグループを定義
@@ -117,28 +121,58 @@ endfunction
 " menu filter
 "---------------------------------------------------------------
 function! s:menu_filter(winid, key) abort
-	if a:key ==# 'q'		" 終了
+	let now = reltime()
+
+	" 前回の打鍵からの経過時間をミリ秒で計算
+	" reltimefloat は秒単位（小数）で返すため 1000 倍する
+	let elapsed = reltimefloat(reltime(s:last_time, l:now)) * 1000
+
+	" 設定値（timeoutlen）を超えていたらバッファをクリア
+	if elapsed > &timeoutlen
+		let s:last_key = ''
+	endif
+
+	" 今回の打鍵時刻を記録
+	let s:last_time = now
+
+	if a:key ==# 'q'			" 終了
 		call popup_close(a:winid, -1)
+		let s:last_key = ''
 		return 1
 
-	elseif a:key ==# 'l' || a:key ==# 'v'	" 開く
-		let s:vsplit = (a:key ==# 'v' ? 1 : 0)
+	elseif a:key =~ '^[l|v]$'	" 開く
+		let s:vsplit = (a:key == 'v' ? 1 : 0)
 		call popup_close(a:winid, getcurpos(a:winid)[1])
+		let s:last_key = ''
 		return 1
 
-	elseif a:key ==# 's'	" 先頭の1文字でフィルタリング
+	elseif a:key ==# 's'		" 先頭の1文字でフィルタリング
 		call s:filter_by_first_character()
 		call s:update_popup(a:winid)
+		let s:last_key = ''
+		return 1
 
-	elseif a:key ==# '/'	" 検索でフィルタリング
+	elseif a:key ==# '/'		" 検索でフィルタリング
 		call s:filter_by_search_pattern()
 		call s:update_popup(a:winid)
+		let s:last_key = ''
+		return 1
 
-	elseif a:key ==# '!'	" リンク切れのファイルを履歴から削除
-		call s:command(a:winid)
+	elseif s:last_key ==# 'd' && a:key ==# 'd'	" 履歴の削除
+		call s:delete_item_from_oldfiles(getcurpos(a:winid)[1])
 		call s:update_popup(a:winid)
+		let s:last_key = ''
+		return 1
+
+	elseif s:last_key ==# 'c' && a:key ==# 'c'	" リンク切れのファイルを履歴から削除
+		call s:remove_non_existing_item_from_oldfiles()
+		call s:update_popup(a:winid)
+		let s:last_key = ''
+		return 1
 
    	endif
+
+	let s:last_key = a:key	
 
 	return popup_filter_menu(a:winid, a:key)
 endfunction
@@ -147,11 +181,11 @@ endfunction
 " filter by first character
 "---------------------------------------------------------------
 function! s:filter_by_first_character() abort
+	call s:load_oldfiles()
+
 	let char = s:getchar("Filtering character: ")
 	if char =~ "[a-z0-9._]"
 		call filter(s:OldFiles, 'fnamemodify(v:val, ":t")[0] ==? char')
-	else
-		call s:load_oldfiles()
 	endif
 endfunction
 
@@ -159,26 +193,11 @@ endfunction
 " filter by search pattern
 "---------------------------------------------------------------
 function! s:filter_by_search_pattern() abort
+	call s:load_oldfiles()
+
 	let pattern = input('/')
 	if !empty(pattern)
 		call filter(s:OldFiles, 'v:val =~ pattern')
-	else
-		call s:load_oldfiles()
-	endif
-endfunction
-
-"---------------------------------------------------------------
-" command mode
-"---------------------------------------------------------------
-function! s:command(winid) abort
-	let char = s:getchar('[c:clean, d:delete]: ')
-
-	if char ==# 'c'
-		call s:remove_non_existing_item_from_oldfiles()
-
-	elseif char ==# 'd'
-		call s:delete_item_from_oldfiles(getcurpos(a:winid)[1])
-
 	endif
 endfunction
 
