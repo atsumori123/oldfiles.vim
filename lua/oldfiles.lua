@@ -125,9 +125,9 @@ local function draw_buffer()
 end
 
 ----------------------------------------------------------------
--- filtering_item
+-- filter_by_first_character
 ----------------------------------------------------------------
-local function filtering_item()
+local function filter_by_first_character()
 	read_oldfiles()
 
 	-- input a search character
@@ -147,6 +147,27 @@ local function filtering_item()
 	draw_buffer()
 end
 
+----------------------------------------------------------------
+-- filter_by_search_pattern
+----------------------------------------------------------------
+local function filter_by_search_pattern()
+	read_oldfiles()
+
+	-- input a search pattern
+	local w = {}
+	local s = vim.fn.input("/")
+	if string.len(s) ~= 0 then
+		-- filtering
+		for k,v in pairs(OldFiles) do
+			if string.find(v, s) then
+				table.insert(w, v)
+			end
+		end
+		OldFiles = w
+	end
+
+	draw_buffer()
+end
 ----------------------------------------------------------------
 -- delete_item_from_file_oldfiles
 ----------------------------------------------------------------
@@ -242,10 +263,11 @@ local function open_window()
 	vim.keymap.set('n', '<CR>', function() select_item("edit") end, opts)
 	vim.keymap.set('n', 'l', function() select_item("edit") end, opts)
 	vim.keymap.set('n', 'v', function() select_item("vsplit") end, opts)
-	vim.keymap.set('n', 's', function() filtering_item() end, opts)
-	vim.keymap.set('n', 'd', function() delete_item_from_file_oldfiles() end, opts)
+	vim.keymap.set('n', 's', function() filter_by_first_character() end, opts)
+	vim.keymap.set('n', '/', function() filter_by_search_pattern() end, opts)
+	vim.keymap.set('n', 'dd', function() delete_item_from_file_oldfiles() end, opts)
 	vim.keymap.set('n', 'q', function() close() end, opts)
-	vim.keymap.set('n', 'clean', function() remove_non_existing_item_from_oldfiles() end, opts)
+	vim.keymap.set('n', 'cc', function() remove_non_existing_item_from_oldfiles() end, opts)
 end
 
 ----------------------------------------------------------------
