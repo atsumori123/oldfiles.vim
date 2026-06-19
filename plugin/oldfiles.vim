@@ -80,8 +80,9 @@ function! s:open_popup() abort
 	endfor
 
 	let opts = {
-			\ 'title': ' oldfiles ',
+			\ 'title': ' oldfiles (l:Open, f:Filter, /:Search, rm:Remove selected item, rn:Remove non exists) ',
 			\ 'border': [1,1,1,1],
+			\ 'borderchars': has('unix') ? [] : ['─','│','─','│','┌','┐','┘','└'],
 			\ 'padding': [1,2,1,2],
 			\ 'maxheight': 20,
 			\ 'minwidth': &columns-20,
@@ -146,7 +147,7 @@ function! s:menu_filter(winid, key) abort
 		let s:last_key = ''
 		return 1
 
-	elseif a:key ==# 's'		" 先頭の1文字でフィルタリング
+	elseif a:key ==# 'f'		" 先頭の1文字でフィルタリング
 		call s:filter_by_first_character()
 		call s:update_popup(a:winid)
 		let s:last_key = ''
@@ -158,13 +159,13 @@ function! s:menu_filter(winid, key) abort
 		let s:last_key = ''
 		return 1
 
-	elseif s:last_key ==# 'd' && a:key ==# 'd'	" 履歴の削除
+	elseif s:last_key ==# 'r' && a:key ==# 'm'	" 履歴の削除
 		call s:delete_item_from_oldfiles(getcurpos(a:winid)[1])
 		call s:update_popup(a:winid)
 		let s:last_key = ''
 		return 1
 
-	elseif s:last_key ==# 'c' && a:key ==# 'c'	" リンク切れのファイルを履歴から削除
+	elseif s:last_key ==# 'r' && a:key ==# 'n'	" リンク切れのファイルを履歴から削除
 		call s:remove_non_existing_item_from_oldfiles()
 		call s:update_popup(a:winid)
 		let s:last_key = ''
@@ -241,16 +242,14 @@ endfunction
 " get character
 "---------------------------------------------------------------
 function! s:getchar(msg)
-	" Workaround for https://github.com/osyo-manga/vital-over/issues/53
 	echo a:msg
-
 	try
-		let char = call('getchar', a:000)
+		let char_raw = getchar()
+		let char = (type(char_raw) == type(0)) ? nr2char(char_raw) : char_raw
 	catch /^Vim:Interrupt$/
-		let char = 3 " <C-c>
+		let char = "\<ESC>"
 	endtry
-	if char == 27 || char == 3
-		" Escape or <C-c> key pressed
+	if char == "\<ESC>"
 		redraw
 		echo "Canceled"
 		return ''
@@ -258,7 +257,7 @@ function! s:getchar(msg)
 
 	redraw
 	echo ""
-	return	nr2char(char)
+	return char
 endfunction
 
 " --------------------------------------------------------------
