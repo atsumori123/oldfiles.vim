@@ -2,16 +2,19 @@
 let s:cpo_save = &cpo
 set cpo&vim
 
-" 複数キーによるコンビネーション用
-let s:last_key = ''
-" 前回打鍵したときの時間
-let s:last_time = [0, 0] " [seconds, microseconds]
+if !has('nvim')
+	" 複数キーによるコンビネーション用
+	let s:last_key = ''
+	" 前回打鍵したときの時間
+	let s:last_time = [0, 0] " [seconds, microseconds]
+	" oldfiles用のハイライトグループを定義
+	if empty(prop_type_get('oldfiles'))
+		call prop_type_add('oldfiles', {'highlight': 'Identifier'})
+	endif
+endif
+
 " Lock ol when execute grep
 let g:lock_oldfiles = 0
-" oldfiles用のハイライトグループを定義
-if empty(prop_type_get('oldfiles'))
-	call prop_type_add('oldfiles', {'highlight': 'Identifier'})
-endif
 
 "---------------------------------------------------------------
 " OL file
@@ -56,11 +59,15 @@ endfunction
 " 出力形式に変換
 "---------------------------------------------------------------
 function! s:make_output(oldfiles) abort
-	let list = map(copy(a:oldfiles), 'fnamemodify(v:val, ":t")."  (" . v:val . ")"')
-	let output = []
-	for v in list
-		call add(output, {'text':v, 'props':[#{col: 1, length: stridx(v, ' (')-1, type: "oldfiles"}]})
-	endfor
+	if has('nvim')
+		let output = map(copy(a:oldfiles), '" " . fnamemodify(v:val, ":t")."  (" . v:val . ")"')
+	else
+		let list = map(copy(a:oldfiles), 'fnamemodify(v:val, ":t")."  (" . v:val . ")"')
+		let output = []
+		for v in list
+			call add(output, {'text':v, 'props':[#{col: 1, length: stridx(v, ' (')-1, type: "oldfiles"}]})
+		endfor
+	endif
 	return output
 endfunction
 
@@ -84,10 +91,14 @@ endfunction
 " Selected handler
 "---------------------------------------------------------------
 function! s:on_select(winid, result) abort
-	if a:result != -1
+	if a:result == -1
+		if has('nvim') | close | endif
+
+	else
 		" 選択項目を取得
 		let fname = win_execute(a:winid, 'echo getline(".")')
 		let fname = matchstr(fname, '(\zs.*\ze)')
+		if has('nvim') | close | endif
 
 		" If already open, jump to it or Edit the file
 		let winnum = bufwinnr('^' . fname . '$')
@@ -104,15 +115,31 @@ endfunction
 "-------------------------------------------------------
 " Update popup menu
 "-------------------------------------------------------
-function! s:update_text(winid, oldfiles) abort
+function! s:update_text(winid, oldfiles, restore_cursor) abort
+	" カーソル位置(行)を取得
+	let lnum = getcurpos(a:winid)[1]
+
 	" 「xxxxx.c (/xxx/xxx/xxx.c)」に成形
 	let output = s:make_output(a:oldfiles)
 
-	" ポップアップメニューの内容を更新
-	call popup_settext(a:winid, output)
+	if has('nvim')
+		" 変更禁止解除→全行消去→描画→変更禁止
+		setlocal modifiable
+		call nvim_buf_set_lines(0, 0, -1, v:false, output)
+		setlocal nomodifiable
+	else
+		" ポップアップメニューの内容を更新
+		call popup_settext(a:winid, output)
+	endif
 
-	" カーソルを先頭に戻す
-    call win_execute(a:winid, 'normal! gg')
+	" カーソル位置の設定
+	if a:restore_cursor
+		" 復元
+		call win_execute(a:winid, 'call cursor(min([lnum, len(output)]), 1)')
+	else
+		" 先頭
+		call win_execute(a:winid, 'normal! gg0')
+	endif
 
 	" 再表示(コマンド行をクリアしたいため)
 	redraw!
@@ -125,10 +152,12 @@ function! s:filter_by_first_character(winid) abort
 	let char = s:get_char("Filtering character: ")
 	if char =~ "[a-z0-9._]"
 		let oldfiles = filter(copy(s:OldFiles), 'fnamemodify(v:val, ":t")[0] ==? char')
-		call s:update_text(a:winid, oldfiles)
+		call s:update_text(a:winid, oldfiles, 0)
 	else
-		call s:update_text(a:winid, s:OldFiles)
+		call s:update_text(a:winid, s:OldFiles, 0)
 	endif
+	redraw
+	echo ""
 endfunction
 
 "---------------------------------------------------------------
@@ -138,29 +167,29 @@ function! s:filter_by_search_pattern(winid) abort
 	let pattern = input('/')
 	if !empty(pattern)
 		let oldfiles = filter(copy(s:OldFiles), 'v:val =~ pattern')
-		call s:update_text(a:winid, oldfiles)
+		call s:update_text(a:winid, oldfiles, 0)
 	else
-		call s:update_text(a:winid, s:OldFiles)
+		call s:update_text(a:winid, s:OldFiles, 0)
 	endif
+	redraw
+	echo ""
 endfunction
 
-if has('nvim')
 "---------------------------------------------------------------
 " delete_item_from_oldfiles
 "---------------------------------------------------------------
-function s:delete_item_from_oldfiles(winid, lnum)
+function s:delete_item_from_oldfiles(winid)
 	" 選択項目を取得
 	let fname = win_execute(a:winid, 'echo getline(".")')
 	let fname = matchstr(fname, '(\zs.*\ze)')
 
 	" 削除対象と一致する履歴を除外する
 	call filter(s:OldFiles, 'v:val != fname')
-	call s:update_text(a:winid, s:OldFiles)
+	call s:update_text(a:winid, s:OldFiles, 1)
 
 	" 履歴をセーブ
 	call writefile(s:OldFiles, s:OL_FILE)
 endfunction
-endif
 
 "---------------------------------------------------------------
 " remove_non_existing_item_from_oldfiles
@@ -172,13 +201,61 @@ function! s:remove_non_existing_item_from_oldfiles(winid) abort
 	" 削除確認してから反映
 	if input(printf("%d files remove ? [y/n] ", len(s:OldFiles) - len(temp))) ==# "y"
 		let s:OldFiles = copy(temp)
-		call s:update_text(a:winid, s:OldFiles)
+		call s:update_text(a:winid, s:OldFiles, 0)
 		call writefile(s:OldFiles, s:OL_FILE)
 	else
 		redraw!
 	endif
 endfunction
 
+if has('nvim')
+"---------------------------------------------------------------
+" Open popup window
+"---------------------------------------------------------------
+function! s:open_popup() abort
+	" create buffer (listed=false, scratch(使い捨て)=true)
+	let bufnr = nvim_create_buf(v:false, v:true)
+
+	" create floating window
+	let width = &columns - 30
+	let height = 20
+	let opts =  {
+			\ 'title':		" oldfiles (l:Open, f:Filter, /:Search, rm:Remove selected item, rn:Remove non exists) ",
+			\ 'style':		"minimal",
+			\ 'relative':	"editor",
+			\ 'height':		height,
+			\ 'width':		width,
+			\ 'col':		float2nr(trunc((&columns - width) / 2)) - 1,
+			\ 'row':		float2nr(trunc((&lines - height) / 2)) - 1,
+			\ 'border':		"single"
+			\ }
+	let winid = nvim_open_win(bufnr, v:true, opts)
+
+	" 履歴を表示
+	call s:update_text(winid, s:OldFiles, 0)
+
+	" set buffer option
+	setlocal bufhidden=wipe
+	setlocal nomodifiable
+	setlocal noswapfile
+	setlocal nowrap
+
+	" set highlight
+	syntax match OLFileName '^.\{-}\ze('
+	highlight default link OLFileName Identifier
+	
+	" キーマップ
+	nnoremap <buffer> <silent> <CR> :call <SID>on_select(win_getid(), 0)<CR>
+	nnoremap <buffer> <silent> l    :call <SID>on_select(win_getid(), 0)<CR>
+	nnoremap <buffer> <silent> v    :call <SID>on_select(win_getid(), 2)<CR>
+	nnoremap <buffer> <silent> f    :call <SID>filter_by_first_character(win_getid())<CR>
+	nnoremap <buffer> <silent> /    :call <SID>filter_by_search_pattern(win_getid())<CR>
+	nnoremap <buffer> <silent> rm   :call <SID>delete_item_from_oldfiles(win_getid())<CR>
+	nnoremap <buffer> <silent> rn   :call <SID>remove_non_existing_item_from_oldfiles(win_getid())<CR>
+	nnoremap <buffer> <silent> q    :call <SID>on_select(win_getid(), -1)<CR>
+endfunction
+
+else
 "---------------------------------------------------------------
 " popup filter
 "---------------------------------------------------------------
@@ -218,7 +295,7 @@ function! s:popup_filter(winid, key) abort
 		return 1
 
 	elseif s:last_key ==# 'r' && a:key ==# 'm'	" 履歴の削除
-		call s:delete_item_from_oldfiles(a:winid, getcurpos(a:winid)[1])
+		call s:delete_item_from_oldfiles(a:winid)
 		let s:last_key = ''
 		return 1
 
@@ -256,6 +333,7 @@ function! s:open_popup() abort
 
 	const winid = popup_menu(output, opts)
 endfunction
+endif
 
 " --------------------------------------------------------------
 " add_item
@@ -302,8 +380,6 @@ function! oldfiles#oldfiles() abort
 		call s:warn_msg('Old files list is empty')
 		return
 	endif
-
-	let s:vsplit = 0
 
 	call s:open_popup()
 endfunction
